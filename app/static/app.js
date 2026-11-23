@@ -261,7 +261,12 @@ function appendLogEntry(logStream, event) {
     <span class="log-agent">${escapeHtml(event.agent)}</span>
     <span>${escapeHtml(event.message)}</span>
   `;
-  logStream.appendChild(div);
+  const cursorLine = document.getElementById("log-cursor-line");
+  if (cursorLine && cursorLine.parentNode === logStream) {
+    logStream.insertBefore(div, cursorLine);
+  } else {
+    logStream.appendChild(div);
+  }
   logStream.scrollTop = logStream.scrollHeight;
 }
 
@@ -301,7 +306,7 @@ function renderFindings(findings) {
           <div class="finding-meta">
             <span class="badge badge-${prio.toLowerCase()}">${prio}</span>
             <span class="mono" style="font-weight: 600; font-size: 13px;">${escapeHtml(f.package)} @ ${escapeHtml(f.version)}</span>
-            <span class="badge" style="background: #F3F4F6; color: var(--ink-2);">${escapeHtml(f.ecosystem)}</span>
+            <span class="badge" style="background: var(--surface); border: 1px solid var(--line); color: var(--ink-2);">${escapeHtml(f.ecosystem)}</span>
             ${kevBadge}
             ${epssBadge}
           </div>
@@ -366,6 +371,8 @@ async function loadRunDetail(runId) {
     const progressBar = document.getElementById("run-progress");
     if (run.status === "done" || run.status === "failed") {
       progressBar.classList.remove("active");
+      const cursorLine = document.getElementById("log-cursor-line");
+      if (cursorLine) cursorLine.style.display = "none";
     }
 
     // Tasks Timeline
@@ -502,6 +509,8 @@ function initRunDetail(runId) {
           if (r.status === "done" || r.status === "failed") {
             const progressBar = document.getElementById("run-progress");
             if (progressBar) progressBar.classList.remove("active");
+            const cursorLine = document.getElementById("log-cursor-line");
+            if (cursorLine) cursorLine.style.display = "none";
             if (activeEventSource) activeEventSource.close();
             // Re-fetch full details for final findings & issue preview
             setTimeout(() => loadRunDetail(runId), 400);
@@ -699,9 +708,9 @@ function initGooeyNav(navEl, options = {}) {
   canvas.style.display = pipeline ? 'block' : 'none';
 
   const computedStyle = getComputedStyle(navEl);
-  const pillColor = computedStyle.getPropertyValue('--gn-pill').trim() || '#0F766E';
+  const pillColor = computedStyle.getPropertyValue('--gn-pill').trim() || '#00E5A0';
   const pillRgb = gnParseColor(pillColor);
-  const hoverRgb = gnParseColor('rgba(15, 118, 110, 0.08)');
+  const hoverRgb = gnParseColor('rgba(0, 229, 160, 0.10)');
 
   const settings = {
     animationTime: options.animationTime ?? 500,
@@ -1176,7 +1185,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const asciiEl = document.getElementById("dashboard-ascii");
   if (asciiEl) {
     initGradientASCII(asciiEl, {
-      colors: ['#0F766E', '#14B8A6', '#99F6E4', '#FBFAF7'],
+      colors: ['#00E5A0', '#00B87A', '#0D4734', '#0A0C0F'],
       shape: 'horizon',
       characters: ' =+xX0S8#@',
       cellSize: 15,
@@ -1660,7 +1669,7 @@ function initGradientASCII(container, options = {}) {
     return rgb;
   };
 
-  const palette = (options.colors && options.colors.length ? options.colors : ['#0F766E', '#14B8A6', '#99F6E4', '#FBFAF7']).slice(0, GA_MAX_COLORS);
+  const palette = (options.colors && options.colors.length ? options.colors : ['#00E5A0', '#00B87A', '#0D4734', '#0A0C0F']).slice(0, GA_MAX_COLORS);
   const settings = {
     colors: palette.length > 1 ? palette : [palette[0], palette[0]],
     shape: GA_SHAPES[options.shape] ?? 0,
