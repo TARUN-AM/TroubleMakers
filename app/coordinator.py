@@ -248,6 +248,7 @@ class Coordinator:
         await self._update_task(remediation_task_id, run_id, "Remediation", "Generate fix plan and GitHub issue", "running", 1)
 
         issue_url = None
+        pr_url = None
         if is_duplicate:
             # Autonomy Rule 5: Duplicate suppression
             await self._log(
@@ -257,12 +258,20 @@ class Coordinator:
                 remediation_task_id, run_id, "Remediation", "Duplicate issue suppressed", "done", 1
             )
         else:
-            from app.agents.remediation import create_remediation_issue
+            from app.agents.remediation import (
+                create_remediation_issue,
+                create_remediation_pr,
+                generate_remediation_diff,
+            )
             issue_url = await create_remediation_issue(
                 run_id, repo, analyzed_findings, is_urgent, db_path=self.db_path
             )
+            diff_data = generate_remediation_diff(repo, analyzed_findings)
+            pr_url = await create_remediation_pr(
+                run_id, repo, analyzed_findings, diff_data, is_urgent=is_urgent, db_path=self.db_path
+            )
             await self._update_task(
-                remediation_task_id, run_id, "Remediation", "Generate fix plan and GitHub issue", "done", 1
+                remediation_task_id, run_id, "Remediation", "Generate fix plan and GitHub issue/PR", "done", 1
             )
 
         summary = f"Completed with {len(analyzed_findings)} findings ({sum(1 for f in analyzed_findings if f['priority']=='P0')} P0)."
@@ -272,6 +281,7 @@ class Coordinator:
             summary=summary,
             urgent=1 if is_urgent else 0,
             issue_url=issue_url,
+            pr_url=pr_url,
             finding_hash=finding_hash,
         )
         await self._log(run_id, "Coordinator", "info", f"Run completed successfully. {summary}")
@@ -282,18 +292,19 @@ class Coordinator:
             "summary": summary,
             "findings": analyzed_findings,
             "issue_url": issue_url,
+            "pr_url": pr_url,
             "finding_hash": finding_hash,
         }
 
     async def _save_findings(self, run_id: int, findings: List[Dict[str, Any]]) -> None:
-        """Persist findings to SQLite."""
+        """Persist findings to SQLite with KEV and EPSS metrics."""
         async with aiosqlite.connect(self.db_path) as db:
             for f in findings:
                 aliases_str = json.dumps(f.get("aliases", []))
                 await db.execute(
                     "INSERT INTO findings (run_id, package, ecosystem, version, vuln_id, aliases, "
-                    "severity, in_kev, priority, impact, fixed_version) "
-                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    "severity, in_kev, epss_score, epss_percentile, priority, impact, fixed_version) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                     (
                         run_id,
                         f["package"],
@@ -303,6 +314,8 @@ class Coordinator:
                         aliases_str,
                         f.get("severity", "UNKNOWN"),
                         f.get("in_kev", 0),
+                        f.get("epss_score", 0.0),
+                        f.get("epss_percentile", 0.0),
                         f.get("priority", "P3"),
                         f.get("impact", ""),
                         f.get("fixed_version"),
@@ -329,6 +342,7 @@ class Coordinator:
         summary: str,
         urgent: int = 0,
         issue_url: Optional[str] = None,
+        pr_url: Optional[str] = None,
         finding_hash: Optional[str] = None,
     ) -> None:
         """Mark run status and finished timestamp."""
@@ -336,8 +350,8 @@ class Coordinator:
         async with aiosqlite.connect(self.db_path) as db:
             await db.execute(
                 "UPDATE runs SET status = ?, summary = ?, urgent = ?, issue_url = ?, "
-                "finding_hash = ?, finished_at = ? WHERE id = ?",
-                (status, summary, urgent, issue_url, finding_hash, now, run_id),
+                "pr_url = ?, finding_hash = ?, finished_at = ? WHERE id = ?",
+                (status, summary, urgent, issue_url, pr_url, finding_hash, now, run_id),
             )
             await db.commit()
 
@@ -347,6 +361,7 @@ class Coordinator:
             "summary": summary,
             "urgent": urgent,
             "issue_url": issue_url,
+            "pr_url": pr_url,
             "finished_at": now,
         }
         await broadcast_run_update(run_id, run_update)

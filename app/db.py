@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS repos (
 CREATE TABLE IF NOT EXISTS runs (
   id INTEGER PRIMARY KEY, repo TEXT NOT NULL, trigger TEXT NOT NULL,
   status TEXT NOT NULL,            -- queued|running|done|failed
-  urgent INTEGER DEFAULT 0, summary TEXT, issue_url TEXT, finding_hash TEXT,
+  urgent INTEGER DEFAULT 0, summary TEXT, issue_url TEXT, pr_url TEXT, finding_hash TEXT,
   started_at TEXT DEFAULT CURRENT_TIMESTAMP, finished_at TEXT
 );
 CREATE TABLE IF NOT EXISTS tasks (
@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS tasks (
 CREATE TABLE IF NOT EXISTS findings (
   id INTEGER PRIMARY KEY, run_id INTEGER NOT NULL, package TEXT, ecosystem TEXT,
   version TEXT, vuln_id TEXT, aliases TEXT, severity TEXT, in_kev INTEGER DEFAULT 0,
+  epss_score REAL DEFAULT 0.0, epss_percentile REAL DEFAULT 0.0,
   priority TEXT, impact TEXT, fixed_version TEXT
 );
 CREATE TABLE IF NOT EXISTS events (
@@ -43,9 +44,19 @@ async def get_db() -> AsyncGenerator[aiosqlite.Connection, None]:
 
 
 async def init_db(db_path: str = DATABASE_PATH) -> None:
-    """Initialize database tables from schema."""
+    """Initialize database tables from schema and apply migrations."""
     async with aiosqlite.connect(db_path) as db:
         await db.executescript(SCHEMA_SQL)
+        # Safe column additions if upgrading existing DB
+        for migration in [
+            "ALTER TABLE runs ADD COLUMN pr_url TEXT",
+            "ALTER TABLE findings ADD COLUMN epss_score REAL DEFAULT 0.0",
+            "ALTER TABLE findings ADD COLUMN epss_percentile REAL DEFAULT 0.0",
+        ]:
+            try:
+                await db.execute(migration)
+            except Exception:
+                pass
         await db.commit()
 
 
@@ -54,4 +65,13 @@ def init_db_sync(db_path: str = DATABASE_PATH) -> None:
     """Synchronous init for testing or standalone CLI scripts."""
     with sqlite3.connect(db_path) as conn:
         conn.executescript(SCHEMA_SQL)
+        for migration in [
+            "ALTER TABLE runs ADD COLUMN pr_url TEXT",
+            "ALTER TABLE findings ADD COLUMN epss_score REAL DEFAULT 0.0",
+            "ALTER TABLE findings ADD COLUMN epss_percentile REAL DEFAULT 0.0",
+        ]:
+            try:
+                conn.execute(migration)
+            except Exception:
+                pass
         conn.commit()

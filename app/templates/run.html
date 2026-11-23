@@ -17,6 +17,9 @@
         <span id="run-issue-container" style="display: none;">
           &bull; <a href="#" id="run-issue-link" target="_blank" rel="noopener" style="font-weight: 600;">View GitHub Issue &rarr;</a>
         </span>
+        <span id="run-pr-container" style="display: none;">
+          &bull; <a href="#" id="run-pr-link" target="_blank" rel="noopener" style="font-weight: 600; color: #047857;">View Pull Request &rarr;</a>
+        </span>
       </div>
     </div>
     <div style="display: flex; gap: 10px; align-items: center;" id="run-badges">
@@ -71,7 +74,7 @@
 
 </div>
 
-<!-- Bottom: Issue Preview -->
+<!-- Bottom: Issue Preview & Git Patch Diff -->
 <div class="card" style="margin-top: 24px;">
   <div class="card-title">
     <span>Remediation Plan &mdash; Issue Preview</span>
@@ -79,6 +82,22 @@
   </div>
   <div id="issue-preview-box" class="issue-preview-box">
     Awaiting Remediation agent completion to generate markdown fix plan...
+  </div>
+</div>
+
+<div class="card" style="margin-top: 24px;" id="patch-card">
+  <div class="card-title">
+    <div style="display: flex; align-items: center; gap: 8px;">
+      <span>Autonomous Fix Patch (Unified Git Diff)</span>
+      <span class="badge" style="background: var(--accent-bg); color: var(--accent);" id="pr-status-badge">Auto PR Ready</span>
+    </div>
+    <div style="display: flex; gap: 8px;">
+      <button type="button" class="btn btn-secondary btn-sm" id="btn-copy-diff">Copy Git Patch</button>
+      <button type="button" class="btn btn-primary btn-sm" id="btn-create-pr">Create Pull Request</button>
+    </div>
+  </div>
+  <div id="diff-preview-box" class="diff-box">
+    Awaiting Remediation agent diff generation...
   </div>
 </div>
 {% endblock %}

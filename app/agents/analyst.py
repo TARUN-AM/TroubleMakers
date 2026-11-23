@@ -4,6 +4,7 @@ import json
 from typing import Any, Dict, List, Optional
 import anthropic
 
+from app.clients.epss import EPSSClient, epss_client
 from app.clients.kev import KEVClient, kev_catalog
 from app.config import ANTHROPIC_API_KEY, ANTHROPIC_MODEL
 
@@ -15,11 +16,17 @@ SYSTEM_PROMPT = (
 )
 
 
-def compute_fallback_priority(severity: str, in_kev: bool) -> str:
-    """Deterministic priority assignment when LLM is unavailable."""
+def compute_fallback_priority(
+    severity: str,
+    in_kev: bool,
+    epss_score: float = 0.0,
+    epss_percentile: float = 0.0,
+) -> str:
+    """Deterministic priority assignment with KEV and EPSS intelligence."""
     if in_kev or severity.upper() == "CRITICAL":
         return "P0"
-    if severity.upper() == "HIGH":
+    # High EPSS (top 10% exploit probability) escalates to P1
+    if epss_percentile >= 0.90 or epss_score >= 0.20 or severity.upper() == "HIGH":
         return "P1"
     if severity.upper() in ("MEDIUM", "MODERATE"):
         return "P2"
@@ -85,21 +92,41 @@ async def analyze_findings(
     findings: List[Dict[str, Any]],
     kev_client: Optional[KEVClient] = None,
     api_key: Optional[str] = None,
+    epss_client_inst: Optional[EPSSClient] = None,
 ) -> List[Dict[str, Any]]:
-    """Analyze a list of findings: check KEV and assign priority & impact."""
+    """Analyze findings: check KEV, query live EPSS scores, and assign priority & impact."""
     kev = kev_client or kev_catalog
     await kev.load_catalog()
 
-    # Step 1: Check KEV for each finding
+    epss = epss_client_inst or epss_client
+    all_cves: List[str] = []
+    for f in findings:
+        candidates = [f["vuln_id"]] + f.get("aliases", [])
+        for c in candidates:
+            if isinstance(c, str) and c.strip().upper().startswith("CVE-"):
+                all_cves.append(c.strip().upper())
+
+    epss_map = await epss.get_scores(all_cves)
+
+    # Step 1: Check KEV and attach EPSS for each finding
     for f in findings:
         f["in_kev"] = 1 if kev.is_in_kev(f["vuln_id"], f.get("aliases")) else 0
+        best_epss = 0.0
+        best_pct = 0.0
+        for c in [f["vuln_id"]] + f.get("aliases", []):
+            c_up = c.strip().upper()
+            if c_up in epss_map:
+                if epss_map[c_up]["epss"] >= best_epss:
+                    best_epss = epss_map[c_up]["epss"]
+                    best_pct = epss_map[c_up]["percentile"]
+        f["epss_score"] = best_epss
+        f["epss_percentile"] = best_pct
 
     key = api_key if api_key is not None else ANTHROPIC_API_KEY
     llm_results: Dict[str, Dict[str, str]] = {}
 
     if key:
         client = anthropic.AsyncAnthropic(api_key=key)
-        # Process in batches of 10
         batch_size = 10
         for i in range(0, len(findings), batch_size):
             batch = findings[i : i + batch_size]
@@ -115,6 +142,8 @@ async def analyze_findings(
         v_id = f["vuln_id"]
         in_kev_bool = bool(f["in_kev"])
         sev = f.get("severity", "UNKNOWN")
+        epss_score = f.get("epss_score", 0.0)
+        epss_pct = f.get("epss_percentile", 0.0)
 
         if v_id in llm_results:
             prio = llm_results[v_id].get("priority")
@@ -123,9 +152,8 @@ async def analyze_findings(
             prio = None
             impact = None
 
-        # Validate priority format
         if prio not in ("P0", "P1", "P2", "P3"):
-            prio = compute_fallback_priority(sev, in_kev_bool)
+            prio = compute_fallback_priority(sev, in_kev_bool, epss_score, epss_pct)
 
         if not impact or not isinstance(impact, str):
             impact = build_fallback_impact(

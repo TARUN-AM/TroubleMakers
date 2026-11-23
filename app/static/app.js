@@ -284,6 +284,15 @@ function renderFindings(findings) {
   container.innerHTML = sorted.map(f => {
     const prio = f.priority || 'P3';
     const kevBadge = f.in_kev ? `<span class="badge-kev">CISA KEV EXPLOITED</span>` : '';
+
+    let epssBadge = '';
+    if (f.epss_percentile && f.epss_percentile > 0) {
+      const pct = Math.round(f.epss_percentile * 100);
+      const isHigh = pct >= 80;
+      const scorePct = (f.epss_score * 100).toFixed(1);
+      epssBadge = `<span class="${isHigh ? 'badge-epss-high' : 'badge-epss'}" title="EPSS: ${scorePct}% exploit probability">EPSS ${pct}th%</span>`;
+    }
+
     const fixedText = f.fixed_version ? `&rarr; Upgrade to <strong>${escapeHtml(f.fixed_version)}</strong>` : 'No safe fix available';
 
     return `
@@ -294,6 +303,7 @@ function renderFindings(findings) {
             <span class="mono" style="font-weight: 600; font-size: 13px;">${escapeHtml(f.package)} @ ${escapeHtml(f.version)}</span>
             <span class="badge" style="background: #F3F4F6; color: var(--ink-2);">${escapeHtml(f.ecosystem)}</span>
             ${kevBadge}
+            ${epssBadge}
           </div>
           <div>
             <a href="https://osv.dev/vulnerability/${escapeHtml(f.vuln_id)}" target="_blank" rel="noopener" class="mono" style="font-size: 11px;">${escapeHtml(f.vuln_id)} &nearr;</a>
@@ -344,6 +354,15 @@ async function loadRunDetail(runId) {
       }
     }
 
+    if (run.pr_url) {
+      const prContainer = document.getElementById("run-pr-container");
+      const prLink = document.getElementById("run-pr-link");
+      if (prContainer && prLink) {
+        prContainer.style.display = "inline";
+        prLink.href = run.pr_url;
+      }
+    }
+
     const progressBar = document.getElementById("run-progress");
     if (run.status === "done" || run.status === "failed") {
       progressBar.classList.remove("active");
@@ -377,6 +396,64 @@ async function loadRunDetail(runId) {
     if (data.issue_preview) {
       previewBox.textContent = data.issue_preview;
       if (issueStatus) issueStatus.textContent = "Ready";
+    }
+
+    // Git Diff Patch Viewer
+    const diffBox = document.getElementById("diff-preview-box");
+    if (diffBox && data.diff_patch) {
+      window._currentDiffPatch = data.diff_patch;
+      const lines = data.diff_patch.split("\n");
+      diffBox.innerHTML = lines.map(line => {
+        if (line.startsWith("+") && !line.startsWith("+++")) {
+          return `<span class="diff-line-add">${escapeHtml(line)}</span>`;
+        } else if (line.startsWith("-") && !line.startsWith("---")) {
+          return `<span class="diff-line-del">${escapeHtml(line)}</span>`;
+        } else if (line.startsWith("@@")) {
+          return `<span class="diff-line-chunk">${escapeHtml(line)}</span>`;
+        }
+        return `<span>${escapeHtml(line)}</span>`;
+      }).join("\n");
+    }
+
+    // Wire up buttons
+    const copyBtn = document.getElementById("btn-copy-diff");
+    if (copyBtn && !copyBtn._bound) {
+      copyBtn._bound = true;
+      copyBtn.addEventListener("click", () => {
+        if (window._currentDiffPatch) {
+          navigator.clipboard.writeText(window._currentDiffPatch).then(() => {
+            const orig = copyBtn.textContent;
+            copyBtn.textContent = "Copied to Clipboard!";
+            setTimeout(() => { copyBtn.textContent = orig; }, 2000);
+          });
+        }
+      });
+    }
+
+    const prBtn = document.getElementById("btn-create-pr");
+    if (prBtn && !prBtn._bound) {
+      prBtn._bound = true;
+      prBtn.addEventListener("click", async () => {
+        prBtn.disabled = true;
+        prBtn.textContent = "Creating PR...";
+        try {
+          const res = await fetch(`/api/runs/${runId}/create-pr`, { method: "POST" });
+          const resData = await res.json();
+          if (resData.pr_url) {
+            prBtn.textContent = "PR Created!";
+            const prContainer = document.getElementById("run-pr-container");
+            const prLink = document.getElementById("run-pr-link");
+            if (prContainer && prLink) {
+              prContainer.style.display = "inline";
+              prLink.href = resData.pr_url;
+            }
+          }
+        } catch (e) {
+          alert("Error creating PR: " + e);
+          prBtn.disabled = false;
+          prBtn.textContent = "Create Pull Request";
+        }
+      });
     }
 
     return run.status;

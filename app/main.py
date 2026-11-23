@@ -13,7 +13,11 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
 
-from app.agents.remediation import format_remediation_issue_body
+from app.agents.remediation import (
+    create_remediation_pr,
+    format_remediation_issue_body,
+    generate_remediation_diff,
+)
 from app.clients.github import validate_repo_name
 from app.config import (
     DATABASE_PATH,
@@ -183,6 +187,7 @@ async def get_run_detail(run_id: int) -> JSONResponse:
         events = [dict(r) for r in await cur.fetchall()]
 
     issue_preview = ""
+    diff_patch = ""
     if findings:
         issue_preview = format_remediation_issue_body(
             run_id=run_id,
@@ -190,6 +195,8 @@ async def get_run_detail(run_id: int) -> JSONResponse:
             findings=findings,
             is_urgent=bool(run_data["urgent"]),
         )
+        diff_data = generate_remediation_diff(run_data["repo"], findings)
+        diff_patch = diff_data.get("patch", "")
 
     return JSONResponse(
         content={
@@ -198,8 +205,42 @@ async def get_run_detail(run_id: int) -> JSONResponse:
             "findings": findings,
             "events": events,
             "issue_preview": issue_preview,
+            "diff_patch": diff_patch,
         }
     )
+
+
+@app.post("/api/runs/{run_id}/create-pr")
+async def trigger_run_pr(run_id: int) -> JSONResponse:
+    """On-demand trigger to generate and open a GitHub Pull Request for a run."""
+    async with aiosqlite.connect(DATABASE_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        cur = await db.execute("SELECT * FROM runs WHERE id = ?", (run_id,))
+        run_row = await cur.fetchone()
+        if not run_row:
+            raise HTTPException(status_code=404, detail="Run not found")
+        run_data = dict(run_row)
+
+        cur = await db.execute("SELECT * FROM findings WHERE run_id = ?", (run_id,))
+        findings = [dict(r) for r in await cur.fetchall()]
+
+    if not findings:
+        raise HTTPException(status_code=400, detail="No findings to remediate for this run")
+
+    diff_data = generate_remediation_diff(run_data["repo"], findings)
+    pr_url = await create_remediation_pr(
+        run_id=run_id,
+        repo=run_data["repo"],
+        findings=findings,
+        diff_data=diff_data,
+        is_urgent=bool(run_data["urgent"]),
+    )
+
+    async with aiosqlite.connect(DATABASE_PATH) as db:
+        await db.execute("UPDATE runs SET pr_url = ? WHERE id = ?", (pr_url, run_id))
+        await db.commit()
+
+    return JSONResponse(content={"pr_url": pr_url, "branch": f"vulnwatch/fix-run-{run_id}"})
 
 
 @app.get("/api/runs/{run_id}/stream")
