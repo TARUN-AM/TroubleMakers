@@ -1,50 +1,73 @@
 # Vulnerability Watch
 
-An autonomous multi-agent security remediation system that inspects software repositories, queries live vulnerability databases, prioritizes active threats using the CISA Known Exploited Vulnerabilities (KEV) catalog, and automatically drafts concrete GitHub remediation plans with safe upgrade versions. Built for speed, reliability, and autonomous decision-making with zero required API keys for local demo evaluation.
+An autonomous multi-agent security remediation system that inspects software repositories, queries live vulnerability intelligence, prioritizes active threats using the **CISA Known Exploited Vulnerabilities (KEV)** catalog and **FIRST.org EPSS** exploit probabilities, and automatically generates concrete GitHub remediation plans with lowest-risk safe versions, unified git diff patches, and autonomous Pull Requests.
 
 ```
 +-----------------------------------------------------------------------------------------+
 |                                  Vulnerability Watch                                    |
-|   Point it at a repo -> Multi-agent team checks OSV + CISA KEV -> Opens prioritized fix  |
+|   Point it at a repo -> Multi-Agent Squad Triages OSV + CISA KEV + EPSS -> Auto-PR Fix  |
 +-----------------------------------------------------------------------------------------+
 ```
 
 ---
 
-## Architecture
+## The Problem
+
+Modern software development organizations face a critical **vulnerability alert fatigue crisis**:
+
+1. **Noise Over Signal:** Standard automated scanners (Dependabot, Snyk, generic SCA tools) flood developer inboxes with hundreds of raw CVE alerts based purely on CVSS severity.
+2. **Exploitation Reality Mismatch:** Studies show that **only ~2% to 4% of all published CVEs are ever actively weaponized in the wild**. An unexploitable CVSS 9.8 in a development utility often paralyzes engineering teams, while an actively exploited CVSS 7.2 zero-day in production gets ignored in the backlog.
+3. **Broken Auto-Updates:** Naive automated PRs bump dependencies to latest major versions, frequently breaking APIs, introducing breaking changes, and forcing developers to reject or ignore automated security fixes.
+4. **Manual Triage Bottleneck:** Security engineers spend hours manually cross-referencing CVE numbers, National Vulnerability Database (NVD) entries, CISA advisory catalogs, and version changelogs just to determine if a vulnerability actually matters.
+
+---
+
+## The Solution
+
+**Vulnerability Watch** replaces noisy scanner dumps with an **autonomous squad of specialized AI agents** that behave like an experienced application security engineering team:
+
+- **True Risk Prioritization:** Correlates every identified vulnerability with live feeds from the **CISA Known Exploited Vulnerabilities (KEV)** catalog and **FIRST.org EPSS (Exploit Prediction Scoring System)**. Actively exploited vulnerabilities are instantly escalated to **P0 (URGENT)**.
+- **Lowest Safe Version Resolution:** Rather than naively upgrading to the latest bleeding-edge version, the system calculates the minimal safe version that resolves all advisories while minimizing breaking API changes.
+- **Autonomous Remediation:** Generates copy-paste upgrade commands, a complete **unified git diff patch**, and can autonomously submit a prioritized **GitHub Pull Request** and **Issue**.
+- **Resilient Multi-Agent Architecture:** Governed by an autonomous Coordinator with 3-attempt exponential backoff retries, SHA-256 finding deduplication, zero-dependency graceful exits, and failure-injection testing modes.
+- **Cybersecurity Console Dashboard:** Server-rendered Jinja2 interface with dark theme, real-time Server-Sent Events (SSE) streaming timeline, ambient WebGL ASCII radar, and zero npm or React build-step overhead.
+
+---
+
+## System Architecture
 
 ```mermaid
 flowchart TD
-    subgraph Triggers ["Triggers"]
+    subgraph Triggers ["Trigger Mechanisms"]
         T1["Web Dashboard (Scan Button)"]
         T2["Background Loop (Asyncio Scheduler)"]
         T3["GitHub Webhook (HMAC SHA-256)"]
-        T4["Simulate Push Button (Demo)"]
+        T4["Simulate Push Button (Demo Mode)"]
     end
 
-    subgraph CoordinatorModule ["Coordinator Agent"]
-        C["Coordinator\n- Life-cycle orchestration\n- 3-attempt exponential retry\n- Urgency (P0) flag\n- Finding hash deduplication"]
+    subgraph CoordinatorModule ["Coordinator Agent (Orchestrator)"]
+        C["Coordinator\n- Execution plan generator\n- 3-attempt exponential backoff retry\n- Dynamic P0 urgency escalation\n- SHA-256 finding hash deduplication"]
     end
 
-    subgraph Agents ["Specialized Agents"]
-        SC["Scanner Agent\nParses requirements.txt & package.json"]
-        AD["Parallel Advisory Agents\n(1 worker per package)\nQueries OSV REST API"]
-        AN["Analyst Agent\nCISA KEV + EPSS matcher + LLM\nFallback deterministic tiering"]
-        RM["Remediation Agent\nComputes lowest safe version\nUnified Git Diff & Autonomous PR"]
+    subgraph Agents ["Specialized Multi-Agent Squad"]
+        SC["Scanner Agent\nParses requirements.txt & package.json\nCanonical package normalization"]
+        AD["Parallel Advisory Agents\n(1 concurrent task per dependency)\nQueries OSV REST API"]
+        AN["Analyst Agent\nCISA KEV + EPSS correlation + Claude\nDeterministic fallback engine"]
+        RM["Remediation Agent\nLowest safe version resolver\nUnified Git Diff & Autonomous PR"]
     end
 
-    subgraph DataSources ["External Live Data Sources"]
+    subgraph DataSources ["Live Threat Intelligence & APIs"]
         OSV["OSV Database\n(api.osv.dev)"]
         KEV["CISA KEV Catalog\n(cisa.gov)"]
-        EPSS["FIRST.org EPSS API\n(Exploit Prediction)"]
+        EPSS["FIRST.org EPSS API\n(api.first.org)"]
         GH["GitHub API\n(Contents, Issues & PRs)"]
-        LLM["Anthropic Claude API\n(Sonnet 3.5 / Fallback)"]
+        LLM["Anthropic Claude API\n(Claude 3.5 Sonnet / Local Fallback)"]
     end
 
-    subgraph StorageStream ["Shared State & Presentation"]
-        DB[("SQLite Database\n(aiosqlite)")]
-        SSE["Server-Sent Events Bus"]
-        UI["Server-Rendered UI\n(Jinja2 + Minimal Rich White)"]
+    subgraph StorageStream ["Shared State & Real-time Presentation"]
+        DB[("SQLite Database\n(aiosqlite async bus)")]
+        SSE["Server-Sent Events (SSE) Bus"]
+        UI["Cybersecurity Console\n(Jinja2 + Vanilla JS + WebGL2)"]
     end
 
     T1 --> C
@@ -62,6 +85,7 @@ flowchart TD
 
     C --> AN
     AN --> KEV
+    AN --> EPSS
     AN --> LLM
     AN --> DB
 
@@ -75,36 +99,109 @@ flowchart TD
 
 ---
 
-## Agent Roster
+## End-to-End Workflow
 
-| Agent | Responsibility | Tools & Data Sources | Autonomy & Resilience Rules |
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User as User / GitHub Webhook
+    participant Coord as Coordinator Agent
+    participant DB as SQLite State Bus
+    participant Scan as Scanner Agent
+    participant Adv as Advisory Agent (Concurrent)
+    participant Anal as Analyst Agent
+    participant Rem as Remediation Agent
+    participant Ext as External APIs (OSV/KEV/EPSS/GitHub)
+    participant UI as Live SSE Console
+
+    User->>Coord: Trigger Scan (Repo, Options)
+    Coord->>DB: Create Run (#ID, status: pending)
+    Coord->>UI: Broadcast Run Started
+
+    %% Phase 1: Scanner
+    Coord->>Scan: Execute Dependency Scan
+    Scan->>Ext: Fetch requirements.txt & package.json
+    Scan->>DB: Record discovered dependencies
+    Scan-->>Coord: Return canonical dependency list
+
+    %% Phase 2: Advisory
+    loop Parallel per dependency
+        Coord->>Adv: Query OSV for Package @ Version
+        Adv->>Ext: POST api.osv.dev/v1/query
+        alt API Failure
+            Adv-->>Coord: Retry with exponential backoff (max 3)
+        end
+        Adv->>DB: Save raw vulnerability advisories
+    end
+    Adv-->>Coord: Advisories collected
+
+    %% Phase 3: Analyst
+    Coord->>Anal: Triage & Correlate Vulnerabilities
+    Anal->>Ext: Query CISA KEV Feed (cisa.gov)
+    Anal->>Ext: Query FIRST.org EPSS API (exploit %)
+    Anal->>Ext: Anthropic Claude (or deterministic fallback)
+    Anal->>DB: Store enriched findings (P0-P3, EPSS %, KEV flag)
+    Anal-->>Coord: Triage complete (Urgent flag if P0)
+
+    %% Phase 4: Remediation
+    Coord->>Rem: Generate Fix Plan
+    Rem->>Rem: Compute lowest safe upgrade version
+    Rem->>Rem: Generate Unified Git Diff patch
+    Rem->>DB: Store Issue preview & patch diff
+    opt If DRY_RUN is false
+        Rem->>Ext: Create GitHub Issue & Pull Request
+    end
+    Rem-->>Coord: Remediation ready
+
+    Coord->>DB: Finalize Run (status: done)
+    Coord->>UI: Stream terminal completion event
+```
+
+---
+
+## Multi-Agent Roster
+
+| Agent | Core Responsibility | Tools & Intelligence Sources | Autonomy & Resilience Rules |
 |---|---|---|---|
-| **Coordinator** | Orchestrates run lifecycle, builds execution plan, spawns parallel subtasks, manages retries, deduplicates issues. | SQLite (`runs`, `tasks`, `events`), SSE EventBus | Handles clean exits on 0 deps, 0 vulns; marks runs `urgent` on P0; suppresses duplicate issues via SHA-256 finding hash. |
-| **Scanner** | Fetches repository files, extracts pinned versions, returns canonical package list (`{ecosystem, name, version}`). | GitHub Contents API, regex parsers, `demo/` fallback | Supports `requirements.txt` (PyPI) and `package.json` (npm). Ignores comments and non-pin operators cleanly. |
-| **Advisory** | Spawned concurrently (one task per package). Queries OSV for known vulnerabilities for that exact package version. | OSV `POST /v1/query`, `cvss` vector parser, `packaging.version` | Coordinator retries failures up to 3 times with exponential backoff; marks task `degraded` if still failing without halting run. |
-| **Analyst** | Correlates CVEs with CISA KEV and FIRST.org EPSS APIs; evaluates severity; batches findings for LLM impact statements and P0–P3 prioritization. | CISA KEV JSON feed, FIRST.org EPSS REST API, Anthropic SDK, regex | **Robust fallback mode:** if `ANTHROPIC_API_KEY` is absent or API fails, uses deterministic priority rules (`in_kev` or critical = P0, high EPSS or high severity = P1, medium = P2, low = P3). |
-| **Remediation** | Computes lowest safe upgrade version, generates unified Git diff patch, drafts Markdown issue, and autonomously creates GitHub Pull Requests. | OSV version ranges, `packaging.version`, GitHub Issues & Pull Requests API | Prioritizes P0 actively-exploited vulnerabilities first, provides copy-paste `pip` and `npm` upgrade commands, visual unified diff viewer, 1-click patch copy, and supports `DRY_RUN=true`. |
+| **Coordinator** | Orchestrates run lifecycle, builds execution DAG, spawns subtasks, tracks state, and finalizes runs. | SQLite (`runs`, `tasks`, `findings`, `events`), SSE EventBus | • Handles clean exits on 0 deps or 0 vulns without error.<br>• Retries failed tasks up to 3 times with exponential backoff.<br>• Dynamically escalates run status to `URGENT` upon encountering P0 vulnerabilities.<br>• Suppresses duplicate issues using SHA-256 finding hashes. |
+| **Scanner** | Fetches repository manifests, parses pinned packages, and outputs normalized dependencies. | GitHub Contents API, regex manifest parsers, `demo/` offline fallback | • Supports `requirements.txt` (PyPI) and `package.json` (npm).<br>• Gracefully ignores comments, wildcards, and non-pinned ranges.<br>• Falls back to bundled vulnerable fixtures for offline evaluation. |
+| **Advisory** | Spawned concurrently (1 async worker per package). Queries vulnerability advisories for exact versions. | OSV REST API (`api.osv.dev`), `packaging.version`, `cvss` vector parser | • Concurrent async requests via `httpx`.<br>• Catches transient network errors; Coordinator retries failed attempts.<br>• Degrades gracefully without halting remaining package checks. |
+| **Analyst** | Evaluates true exploitability, correlates CVEs with known attack databases, and assigns P0–P3 priorities. | CISA KEV catalog, FIRST.org EPSS API, Anthropic SDK (Claude 3.5 Sonnet) | • **Deterministic Fallback Engine:** If no Anthropic API key is provided, applies rule-based tiering (`in_kev` or CVSS&ge;9 = P0, EPSS&ge;0.2 or CVSS&ge;7 = P1, CVSS&ge;4 = P2, else P3). Zero external keys required for evaluation. |
+| **Remediation** | Resolves lowest safe upgrade versions, generates unified Git diff patches, and opens autonomous GitHub PRs. | OSV version ranges, `packaging.version`, GitHub Issues & PR API | • Computes minimal breaking-change upgrade paths.<br>• Generates unified diffs (`+` / `-`) for instant patching.<br>• Provides copy-paste `pip install` and `npm install` instructions.<br>• Supports `DRY_RUN=true` for safe local testing. |
+
+---
+
+## Priority & Severity Matrix
+
+Vulnerability Watch classifies every finding into four actionable tiers based on active weaponization rather than theoretical severity alone:
+
+| Priority | Criteria | Meaning | Action Taken |
+|:---:|---|---|---|
+| <span style="color:#FF4D5E; font-weight:bold;">P0</span> | **In CISA KEV** OR (CVSS &ge; 9.0 + EPSS &ge; 0.20) | **Active Weaponization / Zero-Day** | Escalates run to `URGENT`, triggers immediate notification, prioritized at top of fix plan. |
+| <span style="color:#FF8A3D; font-weight:bold;">P1</span> | CVSS &ge; 7.0 OR EPSS &ge; 0.20 (80th+ percentile) | **High Exploitation Risk** | Flagged as high priority fix in current sprint remediation cycle. |
+| <span style="color:#F5C542; font-weight:bold;">P2</span> | CVSS &ge; 4.0 &ndash; 6.9 | **Medium Severity** | Scheduled for routine patch maintenance. |
+| <span style="color:#7D8896; font-weight:bold;">P3</span> | CVSS &lt; 4.0 OR unrated advisory | **Low Severity** | Informational backlog update. |
 
 ---
 
 ## 5-Step Quickstart (Demo Ready in < 2 Minutes)
 
-Zero external keys required. Works out of the box using real OSV vulnerability queries and the pre-configured `demo/` pinned packages.
+Zero external API keys required. The system works completely out of the box using live OSV vulnerability queries, public CISA KEV feeds, public EPSS endpoints, and bundled `demo/` package fixtures.
 
-### 1. Clone repository
+### 1. Clone the repository
 ```bash
-git clone https://github.com/your-username/vulnerability-watch.git
-cd vulnerability-watch
+git clone https://github.com/TARUN-AM/TroubleMakers.git
+cd TroubleMakers
 ```
 
-### 2. Create virtual environment
+### 2. Set up a Python virtual environment
 ```bash
 python -m venv .venv
 
 # On Linux/macOS:
 source .venv/bin/activate
 
-# On Windows:
+# On Windows (PowerShell):
 .\.venv\Scripts\Activate.ps1
 ```
 
@@ -113,7 +210,7 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 4. Copy environment configuration
+### 4. Create your environment configuration
 ```bash
 # On Linux/macOS:
 cp .env.example .env
@@ -121,22 +218,22 @@ cp .env.example .env
 # On Windows:
 copy .env.example .env
 ```
-*(By default, `DRY_RUN=true` is enabled, requiring no GitHub token or Anthropic API key.)*
+*(By default, `DRY_RUN=true` is enabled, allowing complete end-to-end testing without needing a GitHub token or Anthropic API key).*
 
 ### 5. Launch the application
 ```bash
 uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
-Open your browser to **[http://localhost:8000](http://localhost:8000)**:
-1. Type `demo/vulnerable-app` into the repository box.
-2. (Optional) Check **"Demo: Inject transient failure on 1st Advisory attempt"** to watch the autonomous retry mechanism in action.
-3. Click **Scan** to watch the real-time SSE timeline orchestrate Scanner, Advisory, Analyst, and Remediation agents!
+Open **[http://localhost:8000](http://localhost:8000)** in your browser:
+1. Enter `demo/vulnerable-app` in the repository input.
+2. *(Optional)* Check **"Demo: Inject transient failure on 1st Advisory attempt"** to watch the autonomous retry loop in real time.
+3. Click **Scan** to watch the multi-agent squad execute across the live SSE terminal console!
 
 ---
 
-## Enabling Live GitHub Issues & Webhooks
+## Live GitHub Integration & Webhooks
 
-To connect real GitHub repositories and open live issues:
+To scan live repositories on GitHub and automatically create real Issues and Pull Requests:
 
 ### 1. Configure GitHub Token
 Edit `.env`:
@@ -144,54 +241,72 @@ Edit `.env`:
 GITHUB_TOKEN=ghp_yourPersonalAccessTokenHere
 DRY_RUN=false
 ```
-*Required token scope: `repo` (for private repos) or `public_repo` (for public repos).*
+*Required token scope:* `repo` (for private repositories) or `public_repo` (for public repositories).
 
-### 2. Configure GitHub Webhook
-1. Go to your GitHub repository -> **Settings** -> **Webhooks** -> **Add webhook**.
-2. **Payload URL:** `https://your-public-server.com/webhook/github`
+### 2. Configure GitHub Push Webhook
+1. Go to your GitHub repository &rarr; **Settings** &rarr; **Webhooks** &rarr; **Add webhook**.
+2. **Payload URL:** `https://your-domain.com/webhook/github`
 3. **Content type:** `application/json`
-4. **Secret:** Set to your `GITHUB_WEBHOOK_SECRET` value from `.env` (e.g. `demo_webhook_secret`).
+4. **Secret:** Set to your `GITHUB_WEBHOOK_SECRET` value from `.env` (default: `demo_webhook_secret`).
 5. **Events:** Select "Just the `push` event".
-6. Any push touching `requirements.txt` or `package.json` will automatically trigger an autonomous scan and create an issue.
+6. Every `git push` modifying `requirements.txt` or `package.json` will trigger an autonomous scan and generate remediation plans.
 
-*(Don't have a public domain? Use the **Simulate push** button on the dashboard to test the exact same flow locally!)*
+*(To test webhooks without a public domain, click the **Simulate push** button on the dashboard).*
 
 ---
 
 ## Configuration Reference
 
-| Variable | Default | Description |
+| Environment Variable | Default Value | Purpose |
 |---|---|---|
 | `PORT` | `8000` | Port for the Uvicorn web server |
 | `HOST` | `127.0.0.1` | Network interface host |
 | `DATABASE_PATH` | `vulnerability_watch.db` | SQLite database file location |
-| `GITHUB_TOKEN` | `""` | GitHub Personal Access Token for contents and issues |
-| `GITHUB_WEBHOOK_SECRET` | `demo_webhook_secret` | HMAC secret for verifying GitHub push webhooks |
-| `ANTHROPIC_API_KEY` | `""` | Anthropic Claude API key (optional; system falls back gracefully if unset) |
-| `ANTHROPIC_MODEL` | `claude-sonnet-5-5` | Anthropic model identifier |
-| `SCAN_INTERVAL_MIN` | `60` | Background loop interval (minutes) for scanning watched repos |
-| `DRY_RUN` | `true` | When `true`, renders issue preview without posting to GitHub |
-| `DEMO_INJECT_FAILURE` | `false` | When `true`, artificially fails attempt 1 of the first advisory worker to demonstrate live retries |
+| `GITHUB_TOKEN` | `""` | GitHub Personal Access Token for repository contents, Issues, and PRs |
+| `GITHUB_WEBHOOK_SECRET` | `demo_webhook_secret` | HMAC secret for verifying GitHub push webhook payloads |
+| `ANTHROPIC_API_KEY` | `""` | Anthropic API key (optional; system uses deterministic fallback if absent) |
+| `ANTHROPIC_MODEL` | `claude-sonnet-5-5` | Anthropic Claude model identifier |
+| `SCAN_INTERVAL_MIN` | `60` | Background loop interval in minutes for re-scanning watched repositories |
+| `DRY_RUN` | `true` | When `true`, previews issues and diffs locally without posting to GitHub |
+| `DEMO_INJECT_FAILURE` | `false` | When `true`, artificially fails the first advisory worker to demonstrate retries |
 
 ---
 
-## How This Maps to Judging Criteria
+## Verification & Test Suite
 
-| Criteria | Weight | Implementation in Vulnerability Watch |
-|---|---|---|
-| **Autonomous Execution** | **25%** | • **Zero-dep handling:** Clean "nothing to scan" exit without throwing errors.<br>• **Retry loop:** 3-attempt exponential backoff with graceful degradation to `degraded` if OSV is unreachable.<br>• **Urgency escalation:** Dynamically flags run as `URGENT` when P0 (CISA KEV) vulnerabilities appear.<br>• **Clean exit:** Skips issue creation if 0 vulnerabilities are found.<br>• **Deduplication:** SHA-256 finding hash suppresses duplicate open issues.<br>• **Failure injection:** Built-in UI toggle to demo live retries for judges. |
-| **Problem Relevance** | **20%** | Rather than overwhelming developers with hundreds of unexploited CVEs, it prioritizes **CISA KEV** actively exploited vulnerabilities as **P0**, computes the **lowest safe upgrade version** with `packaging.version`, and provides copy-paste CLI commands. |
-| **Multi-Agent Workflow** | **20%** | 5 distinct agents with specialized roles communicating through typed SQLite records and real-time SSE broadcasts. Parallel Advisory agents execute concurrently (1 async task per package). |
-| **Tools & Integrations** | **15%** | Real integration with live APIs: OSV REST API (`api.osv.dev`), CISA KEV JSON catalog, GitHub Contents/Issues REST API, and Anthropic Claude SDK with constant-time HMAC webhook verification. |
-| **Demo Quality** | **10%** | Calming, minimalist rich white design (Stripe/Linear inspired) with teal accents, real-time Server-Sent Events timeline, live agent activity log, and one-click demo push simulation without needing public URLs. |
-| **Architecture & Engineering** | **10%** | Async I/O throughout (`FastAPI`, `httpx`, `aiosqlite`, `asyncio`), clean separation of concerns, 100% typed functions under 40 lines, comprehensive pytest suite with 23 passing tests. |
+All 28 unit and integration tests verify autonomous rules, version calculations, live threat intelligence feeds, diff generation, and edge cases:
 
----
-
-## Running the Test Suite
-
-Run all unit and integration tests:
 ```bash
 pytest -v tests/
 ```
-All 28 tests cover dependency parsing, CVSS vector evaluation, lowest safe version calculation, CISA KEV matching, live EPSS scores, unified diff generation, automated PR generation, fallback mode, autonomy rules, duplicate suppression, HMAC webhook verification, and API endpoints.
+
+Test coverage includes:
+- Manifest parsing for Python (`requirements.txt`) and Node.js (`package.json`)
+- OSV query responses and CVSS vector score calculations
+- Lowest safe version resolution using `packaging.version`
+- CISA KEV catalog downloads and caching
+- FIRST.org EPSS exploit probability and percentile queries
+- Anthropic Claude batching and deterministic fallback logic
+- Autonomous Git diff generation and Pull Request creation
+- Coordinator autonomy: 3-attempt exponential retry, P0 urgency escalation, 0-dep/0-vuln exits, and SHA-256 duplicate suppression
+- Constant-time HMAC SHA-256 webhook verification
+- REST API and Server-Sent Events (SSE) streaming endpoints
+
+---
+
+## Hackathon Evaluation Mapping
+
+| Judging Criteria | Weight | How Vulnerability Watch Delivers |
+|---|---|---|
+| **Autonomous Execution** | **25%** | Self-directed multi-agent pipeline: handles zero dependencies/vulnerabilities cleanly, retries transient failures with exponential backoff (max 3), suppresses duplicate open issues via SHA-256 finding hashes, and dynamically escalates urgency upon detecting active CISA KEV exploits. |
+| **Problem Relevance** | **20%** | Solves alert fatigue by filtering the 98% of harmless CVEs and highlighting true in-the-wild threats using CISA KEV and EPSS probabilities. Resolves lowest safe upgrade versions to prevent breaking API updates. |
+| **Multi-Agent Workflow** | **20%** | 5 distinct agents with specialized roles communicating asynchronously through typed SQLite records and real-time SSE broadcasts. Parallel Advisory agents run concurrently per package. |
+| **Tools & Integrations** | **15%** | Production integrations with real APIs: Google OSV REST API (`api.osv.dev`), CISA KEV Catalog, FIRST.org EPSS API, GitHub Contents/Issues/PR REST API, and Anthropic Claude SDK with HMAC webhook security. |
+| **Demo Quality** | **10%** | Dark cybersecurity console design with subtle dot-grid, pulsing live status dots, real-time terminal cursor log, ambient WebGL ASCII radar, and instant 1-click failure-injection and push-simulation demo modes. |
+| **Architecture & Engineering** | **10%** | Asynchronous Python 3.12+ stack (`FastAPI`, `httpx`, `aiosqlite`, `asyncio`), clean separation of concerns, strict typed interfaces, zero npm/React dependencies, and 28 passing regression tests. |
+
+---
+
+## License
+
+MIT License. Built for hackathon evaluation and open-source software supply chain defense.
