@@ -231,6 +231,22 @@ Open **[http://localhost:8000](http://localhost:8000)** in your browser:
 
 ---
 
+## 1-Click Cloud Deployment (Render Blueprint)
+
+Vulnerability Watch includes a pre-configured `render.yaml` blueprint for zero-config deployment to [Render](https://render.com):
+
+1. Go to your **[Render Dashboard](https://dashboard.render.com)**.
+2. Click **New +** &rarr; **Blueprint**.
+3. Connect your repository: **`TARUN-AM/TroubleMakers`**.
+4. Render automatically detects `render.yaml`, sets Python 3.12, installs requirements, and configures the start command:
+   ```bash
+   uvicorn app.main:app --host 0.0.0.0 --port $PORT
+   ```
+5. Click **Apply** to deploy your live cybersecurity console.
+6. Once live, configure your GitHub repository webhook pointing to `https://<your-app>.onrender.com/webhook/github`.
+
+---
+
 ## Live GitHub Integration & Webhooks
 
 To scan live repositories on GitHub and automatically create real Issues and Pull Requests:
