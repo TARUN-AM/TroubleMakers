@@ -4,9 +4,9 @@ import asyncio
 from collections import defaultdict
 from datetime import datetime, timezone
 import json
-from typing import AsyncGenerator, Dict, Set
+from typing import AsyncGenerator, Dict, Optional, Set
 import aiosqlite
-from app.config import DATABASE_PATH
+from app import config
 
 
 class EventBus:
@@ -47,10 +47,17 @@ class EventBus:
 event_bus = EventBus()
 
 
-async def log_event(run_id: int, agent: str, level: str, message: str) -> dict:
+async def log_event(
+    run_id: int,
+    agent: str,
+    level: str,
+    message: str,
+    db_path: Optional[str] = None,
+) -> dict:
     """Insert event into the database and broadcast via SSE."""
+    target_db = db_path or config.DATABASE_PATH
     ts = datetime.now(timezone.utc).isoformat()
-    async with aiosqlite.connect(DATABASE_PATH) as db:
+    async with aiosqlite.connect(target_db) as db:
         cursor = await db.execute(
             "INSERT INTO events (run_id, agent, level, message, ts) VALUES (?, ?, ?, ?, ?)",
             (run_id, agent, level, message, ts),
