@@ -3,6 +3,21 @@
 {% block title %}Dashboard &mdash; Vulnerability Watch{% endblock %}
 
 {% block content %}
+<!-- Ambient Live Vulnerability Radar Hero Card -->
+<div class="hero-radar-card">
+  <div class="gradient-ascii-container" id="dashboard-ascii" style="height: 160px;">
+    <canvas class="gradient-ascii-canvas" aria-hidden="true"></canvas>
+  </div>
+  <div class="hero-radar-content">
+    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+      <span class="badge" style="background: var(--accent-bg); color: var(--accent); font-size: 10px; font-weight: 600;">Autonomous Radar</span>
+      <span class="mono" style="font-size: 11px; color: var(--ink-2);">OSV &bull; CISA KEV &bull; EPSS</span>
+    </div>
+    <h1 style="font-size: 18px; font-weight: 600; color: var(--ink); margin-bottom: 4px; letter-spacing: -0.01em;">Live Threat &amp; Vulnerability Radar</h1>
+    <p style="font-size: 13px; color: var(--ink-2); max-width: 540px; line-height: 1.4;">Real-time dependency analysis, CISA KEV exploitation correlation, and automated fix generation. Hover or click to explore the ambient ASCII field.</p>
+  </div>
+</div>
+
 <!-- Trigger Form Card -->
 <div class="card">
   <h1 class="card-title">Trigger Repository Scan</h1>
