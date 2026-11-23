@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard &mdash; Vulnerability Watch{% endblock %}
+
+{% block content %}
+<div class="card">
+  <h1 class="card-title">Trigger Repository Scan</h1>
+  <form id="scan-form" style="display: flex; gap: 12px; align-items: center; max-width: 640px;">
+    <input
+      type="text"
+      id="repo-input"
+      name="repo"
+      class="input-text mono"
+      placeholder="owner/repo (e.g. psf/requests)"
+      required
+      aria-label="Repository name in owner/repo format"
+    >
+    <button type="submit" class="btn btn-primary" id="btn-scan">Scan</button>
+    <button type="button" class="btn btn-secondary" id="btn-simulate-push" title="Simulate a push event without webhook">Simulate push</button>
+  </form>
+</div>
+
+<div class="card">
+  <div class="card-title">
+    <span>Watched Repositories</span>
+    <span class="mono" style="font-size: 12px; color: var(--ink-2);" id="watched-count">0 watched</span>
+  </div>
+  <div id="watched-list">
+    <div class="empty-state">
+      <p>No watched repositories yet. Add repositories to scan on a schedule.</p>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-title">
+    <span>Recent Runs</span>
+  </div>
+  <div class="table-wrap">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Repository</th>
+          <th>Trigger</th>
+          <th>Status</th>
+          <th>Findings</th>
+          <th>Started</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody id="runs-table-body">
+        <tr>
+          <td colspan="7" class="empty-state">No scan runs recorded yet. Start a scan above!</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
