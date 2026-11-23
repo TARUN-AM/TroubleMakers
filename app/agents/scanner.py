@@ -71,6 +71,20 @@ async def scan_repo(
     repo: str, github_client: Optional[GitHubClient] = None
 ) -> List[Dict[str, str]]:
     """Scan repository for dependencies across requirements.txt and package.json."""
+    from pathlib import Path
+    
+    # Demo repo support for offline/demo tests
+    if repo.lower() in ("demo", "demo/vulnerable-app", "local/demo"):
+        demo_dir = Path(__file__).resolve().parent.parent.parent / "demo"
+        deps: List[Dict[str, str]] = []
+        req_p = demo_dir / "requirements.txt"
+        if req_p.exists():
+            deps.extend(parse_requirements(req_p.read_text(encoding="utf-8")))
+        pkg_p = demo_dir / "package.json"
+        if pkg_p.exists():
+            deps.extend(parse_package_json(pkg_p.read_text(encoding="utf-8")))
+        return deps
+
     client = github_client or GitHubClient()
     deps: List[Dict[str, str]] = []
 

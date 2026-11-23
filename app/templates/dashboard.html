@@ -3,38 +3,61 @@
 {% block title %}Dashboard &mdash; Vulnerability Watch{% endblock %}
 
 {% block content %}
+<!-- Trigger Form Card -->
 <div class="card">
   <h1 class="card-title">Trigger Repository Scan</h1>
-  <form id="scan-form" style="display: flex; gap: 12px; align-items: center; max-width: 640px;">
-    <input
-      type="text"
-      id="repo-input"
-      name="repo"
-      class="input-text mono"
-      placeholder="owner/repo (e.g. psf/requests)"
-      required
-      aria-label="Repository name in owner/repo format"
-    >
-    <button type="submit" class="btn btn-primary" id="btn-scan">Scan</button>
-    <button type="button" class="btn btn-secondary" id="btn-simulate-push" title="Simulate a push event without webhook">Simulate push</button>
+  <form id="scan-form" style="display: flex; flex-direction: column; gap: 14px; max-width: 680px;">
+    <div style="display: flex; gap: 10px; align-items: center;">
+      <input
+        type="text"
+        id="repo-input"
+        name="repo"
+        class="input-text mono"
+        placeholder="owner/repo (e.g. psf/requests or demo/vulnerable-app)"
+        required
+        aria-label="Repository name in owner/repo format"
+      >
+      <button type="submit" class="btn btn-primary" id="btn-scan">Scan</button>
+      <button type="button" class="btn btn-secondary" id="btn-simulate-push" title="Simulate a push event without webhook">Simulate push</button>
+    </div>
+    <div style="display: flex; gap: 16px; align-items: center; font-size: 13px; color: var(--ink-2);">
+      <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+        <input type="checkbox" id="inject-failure-check" name="inject_failure">
+        <span>Demo: Inject transient failure on 1st Advisory attempt (watch live retry)</span>
+      </label>
+    </div>
   </form>
 </div>
 
+<!-- Watched Repositories Card -->
 <div class="card">
   <div class="card-title">
-    <span>Watched Repositories</span>
+    <span>Watched Repositories (Auto-scheduled)</span>
     <span class="mono" style="font-size: 12px; color: var(--ink-2);" id="watched-count">0 watched</span>
   </div>
+  <form id="add-repo-form" style="display: flex; gap: 10px; margin-bottom: 16px; max-width: 480px;">
+    <input
+      type="text"
+      id="add-repo-input"
+      class="input-text mono"
+      placeholder="owner/repo to watch on schedule"
+      required
+      aria-label="Repository to watch"
+    >
+    <button type="submit" class="btn btn-secondary btn-sm" style="white-space: nowrap;">+ Add Watched</button>
+  </form>
   <div id="watched-list">
     <div class="empty-state">
-      <p>No watched repositories yet. Add repositories to scan on a schedule.</p>
+      <p>No watched repositories configured yet.</p>
     </div>
   </div>
 </div>
 
+<!-- Recent Runs Table Card -->
 <div class="card">
   <div class="card-title">
-    <span>Recent Runs</span>
+    <span>Recent Scan Runs</span>
+    <button type="button" class="btn btn-secondary btn-sm" id="btn-refresh-runs">Refresh</button>
   </div>
   <div class="table-wrap">
     <table class="table">
@@ -44,6 +67,7 @@
           <th>Repository</th>
           <th>Trigger</th>
           <th>Status</th>
+          <th>Urgency</th>
           <th>Findings</th>
           <th>Started</th>
           <th>Action</th>
@@ -51,10 +75,18 @@
       </thead>
       <tbody id="runs-table-body">
         <tr>
-          <td colspan="7" class="empty-state">No scan runs recorded yet. Start a scan above!</td>
+          <td colspan="8" class="empty-state">Loading scan runs...</td>
         </tr>
       </tbody>
     </table>
   </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    initDashboard();
+  });
+</script>
 {% endblock %}
