@@ -14,10 +14,34 @@
         <div class="logo-symbol">VW</div>
         <div class="logo-text">Vulnerability Watch</div>
       </a>
-      <nav class="nav-links">
-        <a href="/" class="nav-link">Dashboard</a>
-        <a href="/api/health" class="nav-link mono" target="_blank">Health</a>
-        <a href="https://github.com" class="nav-link" target="_blank" rel="noopener">GitHub</a>
+      <nav class="gooey-nav gooey-nav--sm gooey-nav--framed" id="main-nav" aria-label="Main Navigation">
+        <span class="gooey-nav__rim"></span>
+        <div class="gooey-nav__stage">
+          <canvas class="gooey-nav__canvas" aria-hidden="true"></canvas>
+          <span class="gooey-nav__fallback" aria-hidden="true"></span>
+          <ul class="gooey-nav__list">
+            <li class="gooey-nav__item" data-gooey-index="0" data-active>
+              <a href="/" class="gooey-nav__link">Dashboard</a>
+            </li>
+            <li class="gooey-nav__item" data-gooey-index="1">
+              <a href="/api/health" class="gooey-nav__link mono" target="_blank">Health</a>
+            </li>
+            <li class="gooey-nav__item" data-gooey-index="2">
+              <a href="https://github.com" class="gooey-nav__link" target="_blank" rel="noopener">GitHub</a>
+            </li>
+          </ul>
+          <ul class="gooey-nav__list gooey-nav__list--active" aria-hidden="true">
+            <li class="gooey-nav__item">
+              <span class="gooey-nav__link">Dashboard</span>
+            </li>
+            <li class="gooey-nav__item">
+              <span class="gooey-nav__link mono">Health</span>
+            </li>
+            <li class="gooey-nav__item">
+              <span class="gooey-nav__link">GitHub</span>
+            </li>
+          </ul>
+        </div>
       </nav>
     </div>
   </header>

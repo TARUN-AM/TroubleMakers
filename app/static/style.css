@@ -122,6 +122,145 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
   text-decoration: none;
 }
 
+/* GooeyNav Component (React Bits port) */
+.gooey-nav {
+  --gn-pad: 3px;
+  --gn-gap: 3px;
+  --gn-font: 12px;
+  --gn-x: 12px;
+  --gn-y: 5px;
+  --gn-pill: var(--accent);
+  --gn-active-ink: #FFFFFF;
+  --gn-frame: var(--surface);
+  --gn-frame-edge: var(--line);
+  --gn-frame-highlight: rgba(255, 255, 255, 0.95);
+  --gn-frame-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --gn-ink: var(--ink);
+  --gn-muted: var(--ink-2);
+  position: relative;
+  display: inline-flex;
+  max-width: 100%;
+  font-size: var(--gn-font);
+  line-height: 1.2;
+}
+
+.gooey-nav--sm {
+  --gn-pad: 3px;
+  --gn-gap: 2px;
+  --gn-font: 12px;
+  --gn-x: 12px;
+  --gn-y: 5px;
+}
+
+.gooey-nav--framed {
+  padding: var(--gn-pad);
+  border-radius: 999px;
+  background: var(--gn-frame);
+  border: 1px solid var(--gn-frame-edge);
+  box-shadow: var(--gn-frame-shadow);
+}
+
+.gooey-nav__stage {
+  position: relative;
+  max-width: 100%;
+}
+
+.gooey-nav__canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+}
+
+.gooey-nav__fallback {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: none;
+  border-radius: 999px;
+  background: var(--gn-pill);
+  pointer-events: none;
+  transition: transform 0.25s cubic-bezier(0.2, 0.7, 0.2, 1), width 0.25s ease, height 0.25s ease;
+}
+
+.gooey-nav__list {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--gn-gap);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.gooey-nav__list--active {
+  position: absolute;
+  inset: 0;
+  color: var(--gn-active-ink);
+  visibility: hidden;
+  clip-path: inset(100%);
+  pointer-events: none;
+}
+
+.gooey-nav__item {
+  display: flex;
+}
+
+.gooey-nav__link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: var(--gn-y) var(--gn-x);
+  border: none;
+  border-radius: 999px;
+  background: none;
+  color: var(--gn-muted);
+  font: inherit;
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.gooey-nav__list--active .gooey-nav__link {
+  color: inherit;
+}
+
+.gooey-nav__item[data-active] .gooey-nav__link {
+  color: var(--gn-ink);
+}
+
+.gooey-nav__link:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.gooey-nav__icon {
+  display: inline-flex;
+  flex: none;
+}
+
+.gooey-nav__icon svg {
+  width: 1.15em;
+  height: 1.15em;
+}
+
+.gooey-nav__rim {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+@media (hover: hover) {
+  .gooey-nav__link:hover {
+    color: var(--gn-ink);
+    text-decoration: none;
+  }
+}
+
 /* Main Layout */
 .main-content {
   flex: 1;
